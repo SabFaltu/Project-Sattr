@@ -1,36 +1,10 @@
-# sattra
+# Windows UI for Flutter Showcase
 
-A medical management project.
+The app showcase for [fluent_ui](https://pub.dev/packages/fluent_ui).
 
-## Current data points
+To run this app, run `flutter create .` in the terminal to generate the platform specific builds, and then run `flutter run`
 
-| Info             | Type   |
-| ---------------- | ------ |
-| Name             | text   |
-| Age              | Number |
-| Sex              | toggle |
-| Weight           | Number |
-| Address          | text   |
-| Chief Complaints | text   |
+## Acknowledgements
 
----
-
-| Symptom      | Level                          |
-| ------------ | ------------------------------ |
-| sleep        | normal, disrupted, heavy       |
-| bowel        | normal, constipation, frequent |
-| Appetite     | normal, disrupted, heavy       |
-| Digestion    | normal, poor, heavy            |
-| stress       | normal, heavy, poor            |
-| Micturition  | normal, frequent, low          |
-| Tolerance    | normal, hot, cold              |
-| Mensturation | normal, Scanty, heavy          |
-| LMP          | Date                           |
-
-## PostgreSQL
-
-Offline under dev
-
-## Supabase
-
-Refer to dashboard
+* App launcher icon
+  https://mobile.twitter.com/fluentui/photo

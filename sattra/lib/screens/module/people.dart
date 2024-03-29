@@ -1,7 +1,7 @@
 import 'package:fluent_ui/fluent_ui.dart';
 
 class PatientWidget extends StatefulWidget {
-  const PatientWidget({Key? key}) : super(key: key);
+  const PatientWidget({super.key});
 
   @override
   _PatientWidgetState createState() => _PatientWidgetState();

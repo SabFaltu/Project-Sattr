@@ -1,10 +1,12 @@
 import 'package:fluent_ui/fluent_ui.dart';
+import 'package:url_launcher/link.dart';
 
 import '../widgets/material_equivalents.dart';
 import '../widgets/page.dart';
 
+
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -20,8 +22,9 @@ class _HomePageState extends State<HomePage> with PageMixin {
     final theme = FluentTheme.of(context);
 
     return ScaffoldPage.scrollable(
-      header: const PageHeader(
-        title: Text('Project Sattra'),
+      header: PageHeader(
+        title: const Text('Welcome to Sattra'),
+//        commandBar: Row(mainAxisAlignment: MainAxisAlignment.end, children: []),
       ),
       children: [
         Card(
@@ -40,10 +43,10 @@ class _HomePageState extends State<HomePage> with PageMixin {
                 label: 'Forms',
                 child: ComboBox<String>(
                   value: comboboxValue,
-                  items: ['Item 1', 'Item 2', 'Sugma']
+                  items: ['Item 1', 'Item 2']
                       .map((e) => ComboBoxItem(
-                            child: Text(e),
                             value: e,
+                            child: Text(e),
                           ))
                       .toList(),
                   isExpanded: true,
@@ -53,11 +56,14 @@ class _HomePageState extends State<HomePage> with PageMixin {
             ),
             RepaintBoundary(
               child: Padding(
-                padding: const EdgeInsetsDirectional.only(start: 6.9),
+                padding: const EdgeInsetsDirectional.only(start: 4.0),
                 child: InfoLabel(
                   label: 'Progress',
                   child: const SizedBox(
-                      height: 30, width: 30, child: ProgressRing()),
+                    height: 30,
+                    width: 30,
+                    child: ProgressRing(),
+                  ),
                 ),
               ),
             ),
@@ -124,10 +130,37 @@ class _HomePageState extends State<HomePage> with PageMixin {
             ),
           ]),
         ),
-        const SizedBox(height: 22.0),
         subtitle(content: const Text('Equivalents with the material library')),
         const MaterialEquivalents(),
       ],
     );
+  }
+}
+
+class SponsorButton extends StatelessWidget {
+  const SponsorButton({
+    super.key,
+    required this.imageUrl,
+    required this.username,
+  });
+
+  final String imageUrl;
+  final String username;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      Container(
+        height: 60,
+        width: 60,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: NetworkImage(imageUrl),
+          ),
+          shape: BoxShape.circle,
+        ),
+      ),
+      Text(username),
+    ]);
   }
 }

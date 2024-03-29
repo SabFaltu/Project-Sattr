@@ -2,7 +2,7 @@ import '/widgets/page.dart';
 import 'package:fluent_ui/fluent_ui.dart';
 
 class SliderPage extends StatefulWidget {
-  const SliderPage({Key? key}) : super(key: key);
+  const SliderPage({super.key});
 
   @override
   State<SliderPage> createState() => _SliderPageState();
@@ -17,7 +17,7 @@ class _SliderPageState extends State<SliderPage> with PageMixin {
   Widget build(BuildContext context) {
     return ScaffoldPage.scrollable(
       header: PageHeader(
-        title: const Text('Slider'),
+        title: const Text('Appointments'),
         commandBar: ToggleSwitch(
           checked: disabled,
           onChanged: (v) => setState(() => disabled = v),
@@ -26,17 +26,16 @@ class _SliderPageState extends State<SliderPage> with PageMixin {
       ),
       children: [
         const Text(
-          'Use a Slider when you want your users to be able to set defined, '
-          'contiguous values (such as volume or brightness) or a range of discrete '
-          'values (such as screen resolution settings).\n\n'
-          'A slider is a good choice when you know that users think of the value '
-          'as a relative quantity, not a numeric value. For example, users think '
-          'about setting their audio volume to low or medium—not about setting '
-          'the value to 2 or 5.',
+          'Ability to look at appointment of future past '
+          'TBD ability to allow syncing with usual calendar softwares (outlook/gcal) '
+          'Alerts for upcoming appointments.\n\n'
+          'Planned view of a calendar or column style view '
+          'with option to switch between them. '
+          'Calendar design pending with column view a work in progress ',
         ),
-        subtitle(content: const Text('A simple Slider')),
+        subtitle(content: const Text('A WIP')),
         description(
-          content: const Text('A slider that can be used to set a value.'),
+          content: const Text('May be worked on after semester.'),
         ),
       ],
     );

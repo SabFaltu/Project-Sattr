@@ -1,17 +1,16 @@
-import 'screens/home.dart';
-import 'screens/settings.dart';
-import 'theme.dart';
-
+import 'package:sattra/screens/home.dart';
+import 'package:sattra/screens/settings.dart';
 import 'package:fluent_ui/fluent_ui.dart' hide Page;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart' as flutter_acrylic;
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:system_theme/system_theme.dart';
-//import 'package:url_launcher/link.dart';
+import 'package:url_launcher/link.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'routes/screens.dart' deferred as screens;
+import 'routes/views.dart' deferred as views;
+import 'theme.dart';
 import 'widgets/deferred_widget.dart';
 
 const String appTitle = 'Win UI for Sattra';
@@ -40,7 +39,9 @@ void main() async {
 
   if (isDesktop) {
     await flutter_acrylic.Window.initialize();
-//    await flutter_acrylic.Window.hideWindowControls();
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      await flutter_acrylic.Window.hideWindowControls();
+    }
     await WindowManager.instance.ensureInitialized();
     windowManager.waitUntilReadyToShow().then((_) async {
       await windowManager.setTitleBarStyle(
@@ -57,20 +58,20 @@ void main() async {
   runApp(const MyApp());
 
   Future.wait([
-    DeferredWidget.preload(screens.loadLibrary),
+    DeferredWidget.preload(views.loadLibrary),
   ]);
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+final _appTheme = AppTheme();
 
-  // private navigators
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppTheme(),
-      builder: (context, _) {
+    return ChangeNotifierProvider.value(
+      value: _appTheme,
+      builder: (context, child) {
         final appTheme = context.watch<AppTheme>();
         return FluentApp.router(
           title: appTitle,
@@ -118,15 +119,13 @@ class MyApp extends StatelessWidget {
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({
-    Key? key,
+    super.key,
     required this.child,
     required this.shellContext,
-    required this.state,
-  }) : super(key: key);
+  });
 
   final Widget child;
   final BuildContext? shellContext;
-  final GoRouterState state;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -138,79 +137,88 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   // int index = 0;
 
   final viewKey = GlobalKey(debugLabel: 'Navigation View Key');
+  final searchKey = GlobalKey(debugLabel: 'Search Bar Key');
+  final searchFocusNode = FocusNode();
+  final searchController = TextEditingController();
 
-  final List<NavigationPaneItem> originalItems = [
+  late final List<NavigationPaneItem> originalItems = [
     PaneItem(
-      key: const Key('/'),
+      key: const ValueKey('/'),
       icon: const Icon(FluentIcons.home),
       title: const Text('Home'),
       body: const SizedBox.shrink(),
-      onTap: () {
-        if (router.location != '/') router.pushNamed('home');
-      },
     ),
-//    PaneItemHeader(header: const Text('screens')),
-    PaneItemHeader(header: const Text('Management')), // Header
     PaneItem(
-      key: const Key('/view/patient'),
-      icon: const Icon(FluentIcons.people),
+      key: const ValueKey('/views/patient'),
+      icon: const Icon(FluentIcons.medical),
       title: const Text('Patients'),
       body: const SizedBox.shrink(),
-      onTap: () {
-        if (router.location != '/view/patient') {
-          //? If not here
-          router.pushNamed('view_patient'); //? Go here
-        } //? Possible routes in the end
-      },
     ),
     PaneItem(
-      key: const Key('/view/medicines'),
-      icon: const Icon(FluentIcons.health_solid),
-      title: const Text('Medicines'),
+      key: const ValueKey('/views/medicine'),
+      icon: const Icon(FluentIcons.pill),
+      title: const Text('Inventory'),
       body: const SizedBox.shrink(),
-      onTap: () {
-        if (router.location != '/view/medicines') {
-          router.pushNamed('view_medicine');
-        }
-      },
     ),
     PaneItem(
-      key: const Key('/view/appointment'),
-      icon: const Icon(FluentIcons.calendar),
+      key: const ValueKey('/views/appointment'),
+      icon: const Icon(FluentIcons.calendar_agenda),
       title: const Text('Appointments'),
       body: const SizedBox.shrink(),
-      onTap: () {
-        if (router.location != '/view/appointment') {
-          router.pushNamed('view_appointment');
-        }
-      },
     ),
     PaneItemHeader(header: const Text('Storage')),
     PaneItem(
-      key: const Key('/view/storage'),
-      icon: const Icon(FluentIcons.cloud_upload),
-      title: const Text('Storage'),
+      key: const ValueKey('/views/storage'),
+      icon: const Icon(FluentIcons.cloud_add),
+      title: const Text('Storage Used'),
       body: const SizedBox.shrink(),
-      onTap: () {
-        if (router.location != '/view/storage') {
-          router.pushNamed('view_storage');
-        }
-      },
     ),
-  ];
-  final List<NavigationPaneItem> footerItems = [
+  ].map<NavigationPaneItem>((e) {
+    PaneItem buildPaneItem(PaneItem item) {
+      return PaneItem(
+        key: item.key,
+        icon: item.icon,
+        title: item.title,
+        body: item.body,
+        onTap: () {
+          final path = (item.key as ValueKey).value;
+          if (GoRouterState.of(context).uri.toString() != path) {
+            context.go(path);
+          }
+          item.onTap?.call();
+        },
+      );
+    }
+
+    if (e is PaneItemExpander) {
+      return PaneItemExpander(
+        key: e.key,
+        icon: e.icon,
+        title: e.title,
+        body: e.body,
+        items: e.items.map((item) {
+          if (item is PaneItem) return buildPaneItem(item);
+          return item;
+        }).toList(),
+      );
+    }
+    if (e is PaneItem) return buildPaneItem(e);
+    return e;
+  }).toList();
+  late final List<NavigationPaneItem> footerItems = [
     PaneItemSeparator(),
     PaneItem(
-      key: const Key('/settings'),
+      key: const ValueKey('/settings'),
       icon: const Icon(FluentIcons.settings),
       title: const Text('Settings'),
       body: const SizedBox.shrink(),
       onTap: () {
-        if (router.location != '/settings') {
-          router.pushNamed('settings');
+        if (GoRouterState.of(context).uri.toString() != '/settings') {
+          context.go('/settings');
         }
       },
     ),
+
   ];
 
   @override
@@ -222,15 +230,17 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
   @override
   void dispose() {
     windowManager.removeListener(this);
+    searchController.dispose();
+    searchFocusNode.dispose();
     super.dispose();
   }
 
   int _calculateSelectedIndex(BuildContext context) {
-    final location = router.location;
+    final location = GoRouterState.of(context).uri.toString();
     int indexOriginal = originalItems
-        .where((element) => element.key != null)
+        .where((item) => item.key != null)
         .toList()
-        .indexWhere((element) => element.key == Key(location));
+        .indexWhere((item) => item.key == Key(location));
 
     if (indexOriginal == -1) {
       int indexFooter = footerItems
@@ -266,7 +276,6 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
       appBar: NavigationAppBar(
         automaticallyImplyLeading: false,
         leading: () {
-          //! Controlls the Back button
           final enabled = widget.shellContext != null && router.canPop();
 
           final onPressed = enabled
@@ -319,18 +328,21 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
           );
         }(),
         actions: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-          Padding(
-            padding: const EdgeInsetsDirectional.only(end: 8.0),
-            child: ToggleSwitch(
-              content: const Text('Dark Mode'),
-              checked: FluentTheme.of(context).brightness.isDark,
-              onChanged: (v) {
-                if (v) {
-                  appTheme.mode = ThemeMode.dark;
-                } else {
-                  appTheme.mode = ThemeMode.light;
-                }
-              },
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8.0),
+              child: ToggleSwitch(
+                content: const Text('Dark Mode'),
+                checked: FluentTheme.of(context).brightness.isDark,
+                onChanged: (v) {
+                  if (v) {
+                    appTheme.mode = ThemeMode.dark;
+                  } else {
+                    appTheme.mode = ThemeMode.light;
+                  }
+                },
+              ),
             ),
           ),
           if (!kIsWeb) const WindowButtons(),
@@ -360,7 +372,6 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
                 ],
               ).createShader(rect);
             },
-            // Replace with Own Logo
             child: const FlutterLogo(
               style: FlutterLogoStyle.horizontal,
               size: 80.0,
@@ -380,15 +391,66 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
           }
         }(),
         items: originalItems,
+        autoSuggestBox: Builder(builder: (context) {
+          return AutoSuggestBox(
+            key: searchKey,
+            focusNode: searchFocusNode,
+            controller: searchController,
+            unfocusedColor: Colors.transparent,
+            // also need to include sub items from [PaneItemExpander] items
+            items: <PaneItem>[
+              ...originalItems
+                  .whereType<PaneItemExpander>()
+                  .expand<PaneItem>((item) {
+                return [
+                  item,
+                  ...item.items.whereType<PaneItem>(),
+                ];
+              }),
+              ...originalItems
+                  .where(
+                    (item) => item is PaneItem && item is! PaneItemExpander,
+                  )
+                  .cast<PaneItem>(),
+            ].map((item) {
+              assert(item.title is Text);
+              final text = (item.title as Text).data!;
+              return AutoSuggestBoxItem(
+                label: text,
+                value: text,
+                onSelected: () {
+                  item.onTap?.call();
+                  searchController.clear();
+                  searchFocusNode.unfocus();
+                  final view = NavigationView.of(context);
+                  if (view.compactOverlayOpen) {
+                    view.compactOverlayOpen = false;
+                  } else if (view.minimalPaneOpen) {
+                    view.minimalPaneOpen = false;
+                  }
+                },
+              );
+            }).toList(),
+            trailingIcon: IgnorePointer(
+              child: IconButton(
+                onPressed: () {},
+                icon: const Icon(FluentIcons.search),
+              ),
+            ),
+            placeholder: 'Search it all',
+          );
+        }),
+        autoSuggestBoxReplacement: const Icon(FluentIcons.search),
         footerItems: footerItems,
       ),
+      onOpenSearch: searchFocusNode.requestFocus,
     );
   }
 
   @override
   void onWindowClose() async {
-    bool _isPreventClose = await windowManager.isPreventClose();
-    if (_isPreventClose) {
+    bool isPreventClose = await windowManager.isPreventClose();
+    if (isPreventClose && mounted) {
       showDialog(
         context: context,
         builder: (_) {
@@ -418,7 +480,7 @@ class _MyHomePageState extends State<MyHomePage> with WindowListener {
 }
 
 class WindowButtons extends StatelessWidget {
-  const WindowButtons({Key? key}) : super(key: key);
+  const WindowButtons({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -435,77 +497,97 @@ class WindowButtons extends StatelessWidget {
   }
 }
 
+// class _LinkPaneItemAction extends PaneItem {
+//   _LinkPaneItemAction({
+//     required super.icon,
+//     required this.link,
+//     required super.body,
+//     super.title,
+//   });
+
+//   final String link;
+
+//   @override
+//   Widget build(
+//     BuildContext context,
+//     bool selected,
+//     VoidCallback? onPressed, {
+//     PaneDisplayMode? displayMode,
+//     bool showTextOnTop = true,
+//     bool? autofocus,
+//     int? itemIndex,
+//   }) {
+//     return Link(
+//       uri: Uri.parse(link),
+//       builder: (context, followLink) => Semantics(
+//         link: true,
+//         child: super.build(
+//           context,
+//           selected,
+//           followLink,
+//           displayMode: displayMode,
+//           showTextOnTop: showTextOnTop,
+//           itemIndex: itemIndex,
+//           autofocus: autofocus,
+//         ),
+//       ),
+//     );
+//   }
+// }
+
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
-// Everywhere you can go
-final router = GoRouter(
-  navigatorKey: rootNavigatorKey,
-  routes: [
-    ShellRoute(
-      navigatorKey: _shellNavigatorKey,
-      builder: (context, state, child) {
-        return MyHomePage(
-          child: child,
-          shellContext: _shellNavigatorKey.currentContext,
-          state: state,
-        );
-      },
-      routes: [
-        /// Home
-        GoRoute(
-          path: '/',
-          name: 'home',
-          builder: (context, state) => const HomePage(),
-        ),
+final router = GoRouter(navigatorKey: rootNavigatorKey, routes: [
+  ShellRoute(
+    navigatorKey: _shellNavigatorKey,
+    builder: (context, state, child) {
+      return MyHomePage(
+        shellContext: _shellNavigatorKey.currentContext,
+        child: child,
+      );
+    },
+    routes: [
+      /// Home
+      GoRoute(path: '/', builder: (context, state) => const HomePage()),
 
-        /// Settings
-        GoRoute(
-          path: '/settings',
-          name: 'settings',
-          builder: (context, state) => Settings(),
-        ),
+      /// Settings
+      GoRoute(path: '/settings', builder: (context, state) => const Settings()),
 
-        /// /// Input
-        /// Buttons
-        GoRoute(
-          path: '/view/patient',
-          name: 'view_patient',
-          builder: (context, state) => DeferredWidget(
-            screens.loadLibrary,
-            () => screens.PatientsPage(),
-          ),
+      /// /// Input
+      /// Buttons
+      GoRoute(
+        path: '/views/patient',
+        builder: (context, state) => DeferredWidget(
+          views.loadLibrary,
+          () => views.PatientsPage(),
         ),
+      ),
 
-        /// Checkbox
-        GoRoute(
-          path: '/view/medicines',
-          name: 'view_medicine',
-          builder: (context, state) => DeferredWidget(
-            screens.loadLibrary,
-            () => screens.MedicationPage(),
-          ),
+      /// Checkbox
+      GoRoute(
+        path: '/views/medicine',
+        builder: (context, state) => DeferredWidget(
+          views.loadLibrary,
+          () => views.MedicationPage(),
         ),
+      ),
 
-        /// Slider
-        GoRoute(
-          path: '/view/appointment',
-          name: 'view_appointment',
-          builder: (context, state) => DeferredWidget(
-            screens.loadLibrary,
-            () => screens.SliderPage(),
-          ),
+      /// Slider
+      GoRoute(
+        path: '/views/appointment',
+        builder: (context, state) => DeferredWidget(
+          views.loadLibrary,
+          () => views.SliderPage(),
         ),
-
-        /// ToggleSwitch
-        GoRoute(
-          path: '/view/storage',
-          name: 'view_storage',
-          builder: (context, state) => DeferredWidget(
-            screens.loadLibrary,
-            () => screens.ToggleSwitchPage(),
-          ),
+      ),
+      /// NavigationView
+      GoRoute(
+        path: '/views/storage',
+        builder: (context, state) => DeferredWidget(
+          views.loadLibrary,
+          () => views.StoragePage(),
         ),
-      ],
-    ),
-  ],
-);
+      ),
+    ],
+  ),
+]);
