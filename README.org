@@ -1,73 +1,156 @@
-#+title: Project सत्र -  Dev Branch
-
-[[https://github.com/SabFaltu/Project-Sattra][Visit Main Branch]]
+#+title: Project सत्र
 
 * Overview
-This is the development branch for the Satra medical management application. It is currently in active development and is not recommended for production use.
+Project सत्र (Sattra) is an open-source patient management application for
+small and medium clinics. It is a desktop application built with Flutter and
+Dart, using Microsoft's Fluent design language, and it keeps a clinic's records
+in a single SQLite file on the clinic's own machines.
 
-* Current Condition
-Noone but me works on this project.
-
-The only other functional person is the one who calls the panelists and keeps track of phases.
-
-Every word document was and is mine, hello, panelist who can see this.
-
-Saksham Sharma, 22BIS70051
-
-* Resources
-** Textual Resources
-- [[github:bdlukaa/fluent_ui][Fluent_UI by bdlukaa]]
-- [[https:pub.dev/packages/fluentui_system_icons][fluentui_system_icons by Microsoft]]
-- [[https:docs.flutter.dev/cookbook/navigation/navigation-basics][Basic Page navigation]]
-** Video Resources
-- [[https:youtu.be/nyvwx7o277U][Routing and Navigation in Flutter]]
-- [[https:youtu.be/Mt41FpSS-Vo][File Structure Layout]]
-
-** Fonts and Icons
-*** Fonts
-- [[https:fonts.google.com/specimen/Kalam?subset=devanagari&noto.script=Deva][Kalam, by Indian Type Foundry]]
-- Seoge UI, by Simon Daniels
-
-**** Setting the font in Flutter
-- [[https:stackoverflow.com/questions/50081213/how-to-change-the-default-font-in-flutter][Stackoverflow, Changing default font in Flutter]]
-- [[https:stackoverflow.com/questions/71182566/how-to-set-different-fonts-for-different-locales-in-flutter][Stackoverflow, Different fonts for different locales]]
-*** Icons
-- [[https:learn.microsoft.com/en-us/windows/apps/design/style/icons][Microsoft Icons, Windows 10]]
-** Packages
-- [[https:api.flutter.dev/flutter/material/FlutterLogo-class.html][FlutterLogo class]] - Replace with your own icon
-#+title: Project सत्त्र
-#+TITLE: Satra - Medical Management Application
-
-* Overview
-Satra is a medical management application built using the Flutter framework. It is designed to help clinics manage their patients, medication stocks, and appointments more efficiently.
+It runs offline by default. Nothing is sent anywhere unless a clinic
+deliberately connects its terminals to a hub on its own network.
 
 * Features
-- Add, edit, and delete patient records
-- Manage medication stocks and update inventory
-- Assign patients to staff members and manage staff records
-- Schedule and manage appointments with patients
-- Generate patient data in PDF format
+- Patient register with the clinic's own intake form, including the nine-row
+  symptom grid (sleep, bowel, appetite, digestion, stress, micturition,
+  tolerance, menstruation, LMP)
+- Consultations that record the symptom grid each visit, so change over time
+  is visible
+- Formulary and stock control, with a movement ledger and reorder warnings
+- Prescriptions with OD/BD/Hs/TDS/EOD dosing, suggested quantities, and
+  dispensing that deducts stock
+- Appointment diary with clash detection and per-clinician filtering
+- Staff records, two roles (Administrator, Healthcare Provider), and an
+  activity log that attributes every change
+- Printable case sheets, prescription slips, day schedules and stock reports
+- Encrypted backups, CSV import of an existing register, and LAN sync between
+  clinic terminals
 
-* Getting Started
-To get started, clone the repository and run the following command:
+* Getting started
+Requires the Flutter SDK (stable) and a desktop toolchain for the target
+platform.
 
 #+begin_src bash
-flutter run
+flutter pub get
+flutter run -d linux     # or: flutter run -d windows
 #+end_src
 
-* Group Members
-| Members |
-| Ashim   |
-| Aditi   |
-| Bhargav |
-| Dheraj  |
-| Saksham |
+On first launch the application asks for the clinic name, how this machine is
+used, and the first administrator account.
 
+** Trying it with sample data
+#+begin_src bash
+dart run tool/seed_demo.dart demo-data
+SATTRA_DATA_DIR=$PWD/demo-data flutter run -d linux
+#+end_src
 
+Sign in as =s.sharma= / =sattra123= (administrator) or =b.kihore= /
+=sattra123= (provider). Settings has a *Delete records* section for clearing
+the sample data out again before going live.
 
+* Deployment
+Each installation is one of three things, chosen during setup and changeable
+later in *Settings → Clinic network*:
+
+| Role      | What it does                                                       |
+|-----------+--------------------------------------------------------------------|
+| Standalone | Keeps its own records. No networking.                             |
+| Clinic hub | Holds the clinic record and serves the other terminals.           |
+| Terminal   | Keeps a full working copy and syncs it with the hub.              |
+
+The hub generates a *clinic key*. Every terminal is given the same key; it
+encrypts all traffic between machines and is what admits a machine to the
+clinic network. A short fingerprint is shown on each machine so two terminals
+can be checked against each other without either screen displaying the key.
+
+** How sync works
+Terminals push their own unacknowledged changes, then pull everything newer
+than their last watermark. Conflicts are resolved last-write-wins, with ties
+broken deterministically on the originating node id, so two machines resolving
+the same conflict independently reach the same answer. Deletions are
+tombstoned rather than dropped, so a removal propagates instead of the row
+reappearing on the next sync.
+
+Sync runs every two minutes, immediately after signing in, and on demand.
+
+** Where passwords live
+Password verifiers exist only on the hub. They are in tables that are not part
+of the replicated set, so they physically cannot leave that machine through a
+sync.
+
+A terminal signs a user in by asking the hub. On success it caches a verifier
+for *that user on that machine only*, derived under its own random salt, so
+the user can still work if the hub is unreachable later. No terminal ever ends
+up holding the clinic's whole password file.
+
+That cached verifier is deliberately short-lived:
+
+- Changing a password bumps the staff record, which replicates. A terminal
+  refuses any cached verifier older than the staff record it belongs to, so a
+  reset password stops working offline as soon as the record reaches that
+  machine.
+- A verifier is refused outright after 30 days without a successful hub
+  sign-in.
+- A hub that answers and *refuses* a sign-in is final. Only an unreachable hub
+  allows the offline path, so a terminal can never overrule a live rejection
+  with an older cached decision.
+
+** What the clinic key does and does not do
+The clinic key decides which *machines* may talk to the hub. It says nothing
+about who is sitting at one, so the hub authorises every write on its own:
+
+- Staff records may only be pushed by an administrator. They carry the role
+  that authorisation itself reads back, so accepting one from a provider would
+  let them promote themselves.
+- The activity log is append-only for everyone. New entries are accepted;
+  edits and deletions of existing ones are refused.
+- Column names in a sync payload are filtered against the real database schema
+  before any statement is built, so a crafted field name cannot become SQL.
+
+* Data
+Everything lives in one SQLite file. *Settings → Storage* shows its size, what
+it contains, and lets an administrator move it elsewhere.
+
+- *Backups* are a single encrypted file protected by a passphrase the
+  administrator chooses. They include staff accounts, so a restored machine can
+  sign people in on its own.
+- *Import* reads patients or the formulary from CSV. A filled-in sample file
+  can be downloaded from Settings to show the expected format; only =name= is
+  required, and column order and heading style do not matter.
+
+* Project layout
+#+begin_example
+lib/
+  core/        constants (the clinic's own vocabulary), formatting, ids
+  data/        SQLite schema, models, repositories
+  services/    auth, crypto, sync, backup, CSV, PDF, settings
+  features/    one directory per module of the interface
+  state/       the single AppState the interface reads from
+test/          domain, security, sync, CSV, backup and PDF tests
+tool/          seed_demo.dart — sample clinic data
+#+end_example
+
+* Testing
+#+begin_src bash
+flutter analyze
+flutter test
+#+end_src
+
+* Fonts
+- [[https://fonts.google.com/specimen/Kalam][Kalam]] by Indian Type Foundry — Devanagari, SIL Open Font License
+- [[https://fonts.google.com/noto/specimen/Noto+Sans][Noto Sans]] — body text in generated PDFs, SIL Open Font License
+
+The interface itself uses the platform's own UI font, which resolves to Segoe
+UI on Windows. Segoe UI is not redistributable, so it is not bundled here; the
+=Fonts/= directory retains the original project's archive for reference only.
+
+* Group members
+| Members             |
+| Saksham Sharma      |
+| Brian Edwin Kihore  |
+| Sparsh Shandil      |
 
 * Contributing
-Contributions are always welcome! If you have any suggestions or would like to contribute to the project, please feel free to open a pull request or issue.
+Contributions are welcome. Please open an issue or a pull request.
 
 * License
-This project is licensed under the MIT License - see the LICENSE.md file for details.
+MIT. See LICENSE.md.
