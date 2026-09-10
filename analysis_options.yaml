@@ -1,0 +1,14 @@
+# Analysis rules for Project सत्र.
+analyzer:
+  exclude:
+    - build/**
+    - windows/**
+    - linux/**
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # The services take their collaborators as named parameters and store them
+    # in private fields. The lint's suggested fix — `this._db` — is declarable
+    # but not callable from another library, so it cannot be applied here.
+    prefer_initializing_formals: false
