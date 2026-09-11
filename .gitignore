@@ -53,3 +53,6 @@ demo-data/
 *.db-wal
 *.db-shm
 *.sattrabak
+
+linux/
+windows/
